@@ -1,0 +1,25 @@
+{
+    "name": "prasanna/weight-based-shipping",
+    "description": "Weight Based Shipping Plugin for Bagisto",
+    "authors": [
+        {
+            "name": "Prasanna",
+            "email": "prasannanatarajan3595@gmail.com"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            Prasanna\WeightBasedShipping\": "src/
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                Prasanna\WeightBasedShipping\Providers\WeightBasedShippingServiceProvider
+            ],
+            "aliases": {}
+        }
+    },
+    "minimum-stability": "dev"
+}
