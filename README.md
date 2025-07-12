@@ -11,7 +11,7 @@ This plugin provides a flexible weight-based shipping method for your Bagisto e-
 
 ## Installation
 
-### Via Composer (Recommended - After Packagist Publication)
+### Via Composer
 
 Once this package is published on Packagist, you can install it directly via Composer:
 
