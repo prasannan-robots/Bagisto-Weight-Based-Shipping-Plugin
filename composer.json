@@ -1,5 +1,6 @@
 {
-    "name": "prasanna/weight-based-shipping",
+    "name": "prasanna/weight-based-shipping",    
+    "license": "MIT",
     "description": "Weight Based Shipping Plugin for Bagisto",
     "authors": [
         {
@@ -10,13 +11,13 @@
     "require": {},
     "autoload": {
         "psr-4": {
-            Prasanna\WeightBasedShipping\": "src/
+            "Prasanna\\WeightBasedShipping\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                Prasanna\WeightBasedShipping\Providers\WeightBasedShippingServiceProvider
+                "Prasanna\\WeightBasedShipping\\Providers\\WeightBasedShippingServiceProvider"
             ],
             "aliases": {}
         }
