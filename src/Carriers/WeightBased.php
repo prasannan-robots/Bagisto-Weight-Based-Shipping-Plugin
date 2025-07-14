@@ -1,11 +1,10 @@
 <?php
 
-namespace Prasanna\WeightBasedShipping\Carriers;
+namespace Prasanna\WeightShipping\Carriers;
 
-use Webkul\Shipping\Carriers\AbstractShipping;
 use Webkul\Checkout\Facades\Cart;
 use Webkul\Checkout\Models\CartShippingRate;
-use Illuminate\Support\Facades\Log;
+use Webkul\Shipping\Carriers\AbstractShipping;
 
 class WeightBased extends AbstractShipping
 {
@@ -14,17 +13,17 @@ class WeightBased extends AbstractShipping
      *
      * @var string
      */
-    protected $code = 'weight_based';
+    protected $code = 'weightbased';
 
     /**
      * Shipping method code.
      *
      * @var string
      */
-    protected $method = 'weight_based';
+    protected $method = 'weightbased_weightbased';
 
     /**
-     * Calculate rate for weight based shipping.
+     * Calculate rate for weight-based shipping.
      *
      * @return \Webkul\Checkout\Models\CartShippingRate|false
      */
@@ -34,45 +33,18 @@ class WeightBased extends AbstractShipping
             return false;
         }
 
-        $cart = Cart::getCart();
-
-        $totalWeight = 0;
-        foreach ($cart->items as $item) {
-            if ($item->product->getTypeInstance()->isStockable()) {
-                $totalWeight += $item->weight * $item->quantity;
-            }
-        }
-
-        Log::info('WeightBasedShipping: Total Weight: ' . $totalWeight);
-
-        $rates = $this->getRates();
-
-        Log::info('WeightBasedShipping: Configured Rates: ' . json_encode($rates));
-
-        $shippingRate = 0;
-        foreach ($rates as $rate) {
-            if ($totalWeight >= $rate['weight']) {
-                $shippingRate = $rate['price'];
-            }
-        }
-
-        if ($shippingRate > 0) {
-            Log::info('WeightBasedShipping: Calculated Shipping Rate: ' . $shippingRate);
-            return $this->getRate($shippingRate);
-        }
-
-        Log::info('WeightBasedShipping: No valid shipping rate found. Returning false.');
-        return false;
+        return $this->getRate();
     }
 
     /**
-     * Get rate.
-     *
-     * @param float $shippingRate
-     * @return CartShippingRate
+     * Get rate based on cart weight.
      */
-    public function getRate($shippingRate)
+    public function getRate(): CartShippingRate
     {
+        $cart = Cart::getCart();
+        $totalWeight = $this->calculateTotalWeight($cart);
+        $shippingCost = $this->calculateShippingCost($totalWeight);
+
         $cartShippingRate = new CartShippingRate;
 
         $cartShippingRate->carrier = $this->getCode();
@@ -80,43 +52,99 @@ class WeightBased extends AbstractShipping
         $cartShippingRate->method = $this->getMethod();
         $cartShippingRate->method_title = $this->getConfigData('title');
         $cartShippingRate->method_description = $this->getConfigData('description');
-        $cartShippingRate->price = core()->convertPrice($shippingRate);
-        $cartShippingRate->base_price = $shippingRate;
+        $cartShippingRate->price = core()->convertPrice($shippingCost);
+        $cartShippingRate->base_price = $shippingCost;
 
         return $cartShippingRate;
     }
 
     /**
-     * Get rates from config.
+     * Calculate total weight of cart items.
      *
-     * @return array
+     * @param  \Webkul\Checkout\Models\Cart  $cart
+     * @return float
      */
-    public function getRates()
+    private function calculateTotalWeight($cart): float
     {
-        $rates = [];
+        $totalWeight = 0;
 
-        $configRates = $this->getConfigData('rates');
-
-        if ($configRates) {
-            $rateStrings = explode(',', $configRates);
-
-            foreach ($rateStrings as $rateString) {
-                $rateParts = explode(':', $rateString);
-
-                if (count($rateParts) == 2) {
-                    $rates[] = [
-                        'weight' => (float)$rateParts[0],
-                        'price'  => (float)$rateParts[1],
-                    ];
-                }
+        foreach ($cart->items as $item) {
+            if ($item->getTypeInstance()->isStockable()) {
+                $productWeight = $item->product->weight ?? 0;
+                $totalWeight += $productWeight * $item->quantity;
             }
         }
 
-        // Sort rates by weight in ascending order
-        usort($rates, function ($a, $b) {
-            return $a['weight'] <=> $b['weight'];
-        });
+        return $totalWeight;
+    }
 
-        return $rates;
+    /**
+     * Calculate shipping cost based on weight ranges.
+     *
+     * @param  float  $weight
+     * @return float
+     */
+    private function calculateShippingCost(float $weight): float
+    {
+        $weightRanges = $this->parseWeightRanges();
+
+        if (empty($weightRanges)) {
+            return 0;
+        }
+
+        $shippingCost = 0;
+        $lastRange = end($weightRanges);
+
+        foreach ($weightRanges as $range) {
+            if ($weight > $range['min'] && $weight <= $range['max']) {
+                $shippingCost = $range['price'];
+                break;
+            }
+        }
+
+        // If weight exceeds all ranges, use the last range price
+        if ($shippingCost === 0 && $weight > $lastRange['max']) {
+            $shippingCost = $lastRange['price'];
+        }
+
+        return $shippingCost;
+    }
+
+    /**
+     * Parse weight ranges from configuration.
+     *
+     * @return array
+     */
+    private function parseWeightRanges(): array
+    {
+        $weightRangesConfig = $this->getConfigData('weight_ranges');
+        
+        if (empty($weightRangesConfig)) {
+            return [];
+        }
+
+        $ranges = [];
+        $rangeItems = explode(',', $weightRangesConfig);
+        
+        $previousMax = 0;
+        
+        foreach ($rangeItems as $item) {
+            $item = trim($item);
+            if (strpos($item, ':') !== false) {
+                list($max, $price) = explode(':', $item);
+                $max = (float) trim($max);
+                $price = (float) trim($price);
+                
+                $ranges[] = [
+                    'min' => $previousMax,
+                    'max' => $max,
+                    'price' => $price
+                ];
+                
+                $previousMax = $max;
+            }
+        }
+
+        return $ranges;
     }
 }
